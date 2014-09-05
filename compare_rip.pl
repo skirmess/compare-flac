@@ -19,8 +19,8 @@ if ( $#ARGV != 1 ) {
 }
 
 my %directoryName = (
-	"L"	=> $ARGV[0],
-	"R"	=> $ARGV[1]
+	"L" => $ARGV[0],
+	"R" => $ARGV[1]
 );
 
 # ----------------------------------------------------------
@@ -28,36 +28,36 @@ my %directoryName = (
 my %blocks;
 
 sub addBlock {
-	my ($id, $block) = @_;
+	my ( $id, $block ) = @_;
 
-	if ( ! defined ${ $block }{"type"} ) {
+	if ( !defined ${$block}{"type"} ) {
 		die "Block doesn't have a type.";
 	}
 
-	my $type = ${ $block }{"type"};
+	my $type = ${$block}{"type"};
 	$type =~ s/\s.*//;
 	if ( defined $blocks{$id}{$type} ) {
 		die "Block type $type defined multiple times.";
 	}
-	%{$blocks{$id}{$type}} = %{ $block };
+	%{ $blocks{$id}{$type} } = %{$block};
 }
 
 sub parseFlac {
-	my ($id, $file) = @_;
+	my ( $id, $file ) = @_;
 
-	open(my $fh, "metaflac --list \"$file\" |") or die "$!: $file";
+	open( my $fh, "metaflac --list \"$file\" |" ) or die "$!: $file";
 
 	my $state = 0;
 	my %block;
 
-	while (my $line = <$fh>) {
+	while ( my $line = <$fh> ) {
 		$line =~ s///g;
 		chomp $line;
 
 		if ( $line =~ m/^METADATA block #\d+$/ ) {
 
 			if ( $state != 0 ) {
-				addBlock($id, \%block);
+				addBlock( $id, \%block );
 			}
 
 			%block = ();
@@ -84,7 +84,7 @@ sub parseFlac {
 		die "no block found, should never happen.";
 	}
 
-	addBlock($id, \%block);
+	addBlock( $id, \%block );
 
 	close($fh) or die "$!";
 }
@@ -94,13 +94,13 @@ sub parseFlac {
 sub parseDir {
 	my ($dname) = @_;
 
-	opendir(D, $dname) or die "$!: $dname";
+	opendir( D, $dname ) or die "$!: $dname";
 
 	my %files;
-	while (my $dent = readdir(D)) {
-		next if (( $dent eq '.') or ($dent eq '..'));
+	while ( my $dent = readdir(D) ) {
+		next if ( ( $dent eq '.' ) or ( $dent eq '..' ) );
 
-		if ( $dent =~  m/.\.(m3u|cue|log)$/ ) {
+		if ( $dent =~ m/.\.(m3u|cue|log)$/ ) {
 			my $fileType = $1;
 
 			if ( defined $files{$fileType} ) {
@@ -112,7 +112,7 @@ sub parseDir {
 		elsif ( $dent =~ m/[^\d]*(\d+).*\.flac$/ ) {
 			my $track = $1 + 0;
 			if ( defined $files{"flac"}{$track} ) {
-				die "Two flac files for track $track: ".$files{"flac"}{$track}." <-> $dent";
+				die "Two flac files for track $track: " . $files{"flac"}{$track} . " <-> $dent";
 			}
 			$files{"flac"}{$track} = $dent;
 			next;
@@ -121,29 +121,28 @@ sub parseDir {
 		die "unknown file: $dent";
 	}
 
-
 	closedir(D) or die "$!: $dname";
 
-	return(%files);
+	return (%files);
 }
 
 # ----------------------------------------------------------
 #
 
 my %files;
-%{ $files{"L"} } = parseDir($directoryName{"L"});
-%{ $files{"R"} } = parseDir($directoryName{"R"});
+%{ $files{"L"} } = parseDir( $directoryName{"L"} );
+%{ $files{"R"} } = parseDir( $directoryName{"R"} );
 
-for my $type ("cue", "m3u", "log") {
-	if ( ! defined $files{"L"}{$type} ) {
-		if ( ! defined $files{"R"}{$type} ) {
+for my $type ( "cue", "m3u", "log" ) {
+	if ( !defined $files{"L"}{$type} ) {
+		if ( !defined $files{"R"}{$type} ) {
 			print "<=> no $type file\n";
 		}
 		else {
 			print "<== no $type file\n";
 		}
 	}
-	elsif ( ! defined $files{"R"}{$type}  ) {
+	elsif ( !defined $files{"R"}{$type} ) {
 		print "==> no $type file\n";
 	}
 }
@@ -156,86 +155,85 @@ foreach my $track ( keys %{ $files{"L"}{"flac"} }, keys %{ $files{"R"}{"flac"} }
 foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 	my $differencesFound = 0;
 
-	if ( ! defined $files{"L"}{"flac"}{$track} ) {
+	if ( !defined $files{"L"}{"flac"}{$track} ) {
 		print "<== track $track no flac file\n";
 		next;
 	}
-	if ( ! defined $files{"R"}{"flac"}{$track} ) {
+	if ( !defined $files{"R"}{"flac"}{$track} ) {
 		print "==> track $track no flac file\n";
 		next;
 	}
 
 	%blocks = ();
 
-	parseFlac("L", $directoryName{"L"}."/".$files{"L"}{"flac"}{$track});
-	parseFlac("R", $directoryName{"R"}."/".$files{"R"}{"flac"}{$track});
+	parseFlac( "L", $directoryName{"L"} . "/" . $files{"L"}{"flac"}{$track} );
+	parseFlac( "R", $directoryName{"R"} . "/" . $files{"R"}{"flac"}{$track} );
 
 	my %sections;
-	foreach my $section (keys %{ $blocks{"L"} }, keys %{ $blocks{"R"} }) {
+	foreach my $section ( keys %{ $blocks{"L"} }, keys %{ $blocks{"R"} } ) {
 		$sections{$section} = 1;
 	}
 
-	foreach my $section (sort {$a <=> $b} keys %sections) {
-		if ( ! defined $blocks{"L"}{$section} ) {
+	foreach my $section ( sort { $a <=> $b } keys %sections ) {
+		if ( !defined $blocks{"L"}{$section} ) {
 			print "<== track $track section $section: missing\n";
 			next;
 		}
-		elsif ( ! defined $blocks{"R"}{$section} ) {
+		elsif ( !defined $blocks{"R"}{$section} ) {
 			print "==> track $track section $section: missing\n";
 			next;
 		}
 
-		if (( $section == 1 ) or ( $section == 3 )) {
+		if ( ( $section == 1 ) or ( $section == 3 ) ) {
 			print "<=> track $track section $section: ignoring\n";
 			next;
 		}
 
 		if ( $section == 0 ) {
 			my %keys;
-			foreach my $key ( keys %{ $blocks{"L"}{$section} }, keys %{ $blocks{"R"}{$section} }) {
+			foreach my $key ( keys %{ $blocks{"L"}{$section} }, keys %{ $blocks{"R"}{$section} } ) {
 				$keys{$key} = 1;
 			}
 
-			foreach my $key (sort keys %keys) {
-				if ( ( ! defined $blocks{"L"}{$section}{$key} ) or ( ! defined $blocks{"R"}{$section}{$key} ) ) {
+			foreach my $key ( sort keys %keys ) {
+				if ( ( !defined $blocks{"L"}{$section}{$key} ) or ( !defined $blocks{"R"}{$section}{$key} ) ) {
 					die "track $track section $section: key $key only in one file.";
 				}
 
-				if (
-					( $key eq "maximum blocksize" ) or
-					( $key eq "maximum framesize" ) or
-					( $key eq "minimum blocksize" ) or
-					( $key eq "minimum framesize" ) or
-					( $key eq "is last" )
-				) {
+				if (       ( $key eq "maximum blocksize" )
+					or ( $key eq "maximum framesize" )
+					or ( $key eq "minimum blocksize" )
+					or ( $key eq "minimum framesize" )
+					or ( $key eq "is last" ) )
+				{
 					next;
 				}
 
 				if ( $blocks{"L"}{$section}{$key} ne $blocks{"R"}{$section}{$key} ) {
-					print "<=> track $track section $section: $key differs: ".$blocks{"L"}{$section}{$key}." <=> ".$blocks{"R"}{$section}{$key}."\n";
+					print "<=> track $track section $section: $key differs: " . $blocks{"L"}{$section}{$key} . " <=> " . $blocks{"R"}{$section}{$key} . "\n";
 					$differencesFound = 1;
 				}
 			}
-			
+
 			next;
 		}
 
 		if ( $section == 4 ) {
 			my %keys;
-			foreach my $key ( keys %{ $blocks{"L"}{$section} }, keys %{ $blocks{"R"}{$section} }) {
+			foreach my $key ( keys %{ $blocks{"L"}{$section} }, keys %{ $blocks{"R"}{$section} } ) {
 				$keys{$key} = 1;
 			}
 
 			my %comments;
-			foreach my $key (sort keys %keys) {
+			foreach my $key ( sort keys %keys ) {
 				if ( $key =~ m/^comment\[\d+\]$/ ) {
-					foreach my $side ("R", "L") {
+					foreach my $side ( "R", "L" ) {
 						if ( defined $blocks{$side}{$section}{$key} ) {
 							if ( $blocks{$side}{$section}{$key} =~ m/([^=]+)=(.+)/ ) {
 								$comments{$side}{$1} = $2;
 							}
 							else {
-								die "not key=value: ".$blocks{$side}{$section}{$key};
+								die "not key=value: " . $blocks{$side}{$section}{$key};
 							}
 						}
 					}
@@ -243,47 +241,45 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 					next;
 				}
 
-				if ( ( ! defined $blocks{"L"}{$section}{$key} ) or ( ! defined $blocks{"R"}{$section}{$key} ) ) {
+				if ( ( !defined $blocks{"L"}{$section}{$key} ) or ( !defined $blocks{"R"}{$section}{$key} ) ) {
 					die "key $key only in one file.";
 				}
 
-				if (
-					( $key eq "length" ) or
-					( $key eq "vendor string" ) or
-					( $key eq "comments" ) or
-					( $key eq "is last" )
-				) {
+				if (       ( $key eq "length" )
+					or ( $key eq "vendor string" )
+					or ( $key eq "comments" )
+					or ( $key eq "is last" ) )
+				{
 					next;
 				}
 
 				if ( $blocks{"L"}{$section}{$key} ne $blocks{"R"}{$section}{$key} ) {
-					print "<=> track $track section $section: $key differs: ".$blocks{"L"}{$section}{$key}." <=> ".$blocks{"R"}{$section}{$key}."\n";
+					print "<=> track $track section $section: $key differs: " . $blocks{"L"}{$section}{$key} . " <=> " . $blocks{"R"}{$section}{$key} . "\n";
 					$differencesFound = 1;
 				}
 			}
 
 			%keys = ();
-			foreach my $key ( keys %{ $comments{"L"} }, keys %{ $comments{"R"} }) {
+			foreach my $key ( keys %{ $comments{"L"} }, keys %{ $comments{"R"} } ) {
 				$keys{$key} = 1;
 			}
 
-			foreach my $key (sort keys %keys) {
-				if (
-					( $key eq 'REPLAYGAIN_ALBUM_GAIN' ) or
-					( $key eq 'REPLAYGAIN_ALBUM_PEAK' ) or
-					( $key eq 'REPLAYGAIN_REFERENCE_LOUDNESS' ) or
-					( $key eq 'REPLAYGAIN_TRACK_GAIN' ) or
-					( $key eq 'REPLAYGAIN_TRACK_PEAK' )
-				) {
+			foreach my $key ( sort keys %keys ) {
+				if (       ( $key eq 'REPLAYGAIN_ALBUM_GAIN' )
+					or ( $key eq 'REPLAYGAIN_ALBUM_PEAK' )
+					or ( $key eq 'REPLAYGAIN_REFERENCE_LOUDNESS' )
+					or ( $key eq 'REPLAYGAIN_TRACK_GAIN' )
+					or ( $key eq 'REPLAYGAIN_TRACK_PEAK' ) )
+				{
 					next;
 				}
 
-				if ( ! defined $comments{"L"}{$key} ) {
-					print "==> track $track section $section: additional comment: $key=".$comments{"R"}{$key}."\n";
+				if ( !defined $comments{"L"}{$key} ) {
+					print "==> track $track section $section: additional comment: $key=" . $comments{"R"}{$key} . "\n";
 					$differencesFound = 1;
 				}
-				elsif ( ! defined $comments{"R"}{$key} ) {
-					print "<== track $track section $section: additional comment: $key=".$comments{"L"}{$key}."\n";
+				elsif ( !defined $comments{"R"}{$key} ) {
+					print "<== track $track section $section: additional comment: $key=" . $comments{"L"}{$key} . "\n";
 					$differencesFound = 1;
 				}
 				elsif ( $comments{"L"}{$key} ne $comments{"R"}{$key} ) {
@@ -296,7 +292,7 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 						}
 					}
 
-					print "<=> track $track section $section: comment $key differs: ".$comments{"L"}{$key}." <=> ".$comments{"R"}{$key}."\n";
+					print "<=> track $track section $section: comment $key differs: " . $comments{"L"}{$key} . " <=> " . $comments{"R"}{$key} . "\n";
 					$differencesFound = 1;
 				}
 			}
@@ -307,7 +303,7 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 		die "Unhandled section $section";
 	}
 
-	if ($differencesFound == 0) {
+	if ( $differencesFound == 0 ) {
 		print "=== track $track no differences\n";
 	}
 }

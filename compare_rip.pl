@@ -244,9 +244,7 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 				}
 
 				if ( $blocks{"L"}{$section}{$key} ne $blocks{"R"}{$section}{$key} ) {
-					print "<=> track $track section $section: $key differs: "
-					  . $blocks{"L"}{$section}{$key} . " <=> "
-					  . $blocks{"R"}{$section}{$key} . "\n";
+					print "<=> track $track section $section: $key differs: " . $blocks{"L"}{$section}{$key} . " <=> " . $blocks{"R"}{$section}{$key} . "\n";
 					$differencesFound = 1;
 				}
 			}
@@ -292,9 +290,7 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 				}
 
 				if ( $blocks{"L"}{$section}{$key} ne $blocks{"R"}{$section}{$key} ) {
-					print "<=> track $track section $section: $key differs: "
-					  . $blocks{"L"}{$section}{$key} . " <=> "
-					  . $blocks{"R"}{$section}{$key} . "\n";
+					print "<=> track $track section $section: $key differs: " . $blocks{"L"}{$section}{$key} . " <=> " . $blocks{"R"}{$section}{$key} . "\n";
 					$differencesFound = 1;
 				}
 			}
@@ -330,15 +326,13 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 
 				if ( !defined $comments{"L"}{$key} ) {
 					if ( $skipIfOnlyInOneFile == 0 ) {
-						print "==> track $track section $section: additional comment: $key="
-						  . $comments{"R"}{$key} . "\n";
+						print "==> track $track section $section: additional comment: $key=" . $comments{"R"}{$key} . "\n";
 						$differencesFound = 1;
 					}
 				}
 				elsif ( !defined $comments{"R"}{$key} ) {
 					if ( $skipIfOnlyInOneFile == 0 ) {
-						print "<== track $track section $section: additional comment: $key="
-						  . $comments{"L"}{$key} . "\n";
+						print "<== track $track section $section: additional comment: $key=" . $comments{"L"}{$key} . "\n";
 						$differencesFound = 1;
 					}
 				}
@@ -352,9 +346,7 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 						}
 					}
 
-					print "<=> track $track section $section: comment $key differs: "
-					  . $comments{"L"}{$key} . " <=> "
-					  . $comments{"R"}{$key} . "\n";
+					print "<=> track $track section $section: comment $key differs: " . $comments{"L"}{$key} . " <=> " . $comments{"R"}{$key} . "\n";
 					$differencesFound = 1;
 				}
 			}

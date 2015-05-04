@@ -51,12 +51,11 @@ sub parseFlac {
 	my %block;
 
 	while ( my $line = <$fh> ) {
-		$line =~ s///g;
 		chomp $line;
 
 		if ( $line =~ m/^METADATA block #\d+$/ ) {
 
-			if ( $state != 0 ) {
+			if ( $state > 2 ) {
 				addBlock( $id, \%block );
 			}
 
@@ -66,8 +65,44 @@ sub parseFlac {
 			next;
 		}
 
+		if ( $state == 2 ) {
+			next;
+		}
+
 		if ( $state == 1 ) {
+			if ( $line !~ m/\s*(.*):\s*(.*)/ ) {
+				die "internal error";
+			}
+			my $key   = $1;
+			my $value = $2;
+
+			if ( $key ne "type" ) {
+				die "first line is not \"type:\".";
+			}
+			if (       ( $value eq "0 (STREAMINFO)" )
+				or ( $value eq "4 (VORBIS_COMMENT)" ) )
+			{
+				$state = 3;
+			}
+			elsif (    ( $value eq "3 (SEEKTABLE)" )
+				or ( $value eq "6 (PICTURE)" )
+				or ( $value eq "1 (PADDING)" ) )
+			{
+
+				# ignore
+				$state = 2;
+				next;
+			}
+			else {
+				die "unknown block: $value";
+			}
+		}
+
+		if ( $state == 3 ) {
 			if ( $line =~ m/\s*(.*):\s*(.*)/ ) {
+				if ( defined $block{$1} ) {
+					die "overwriting $1: is $block{$1} new $2\n";
+				}
 				$block{$1} = $2;
 
 				next;
@@ -75,18 +110,22 @@ sub parseFlac {
 			else {
 				die "Unknown entry in block.";
 			}
+
+			next;
 		}
 
-		die "unknown content: \"$line\"";
+		die "internal error";
 	}
 
 	if ( $state == 0 ) {
 		die "no block found, should never happen.";
 	}
 
-	addBlock( $id, \%block );
-
 	close($fh) or die "$!";
+
+	if ( $state > 2 ) {
+		addBlock( $id, \%block );
+	}
 }
 
 # ----------------------------------------------------------
@@ -100,7 +139,7 @@ sub parseDir {
 	while ( my $dent = readdir(D) ) {
 		next if ( ( $dent eq '.' ) or ( $dent eq '..' ) );
 
-		if ( $dent =~ m/.\.(m3u|cue|log)$/ ) {
+		if ( $dent =~ m/.\.(m3u|cue|log|jpg)$/ ) {
 			my $fileType = $1;
 
 			if ( defined $files{$fileType} ) {
@@ -133,7 +172,7 @@ my %files;
 %{ $files{"L"} } = parseDir( $directoryName{"L"} );
 %{ $files{"R"} } = parseDir( $directoryName{"R"} );
 
-for my $type ( "cue", "m3u", "log" ) {
+for my $type ( "cue", "m3u", "log", "jpg" ) {
 	if ( !defined $files{"L"}{$type} ) {
 		if ( !defined $files{"R"}{$type} ) {
 			print "<=> no $type file\n";
@@ -184,11 +223,6 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 			next;
 		}
 
-		if ( ( $section == 1 ) or ( $section == 3 ) ) {
-			print "<=> track $track section $section: ignoring\n";
-			next;
-		}
-
 		if ( $section == 0 ) {
 			my %keys;
 			foreach my $key ( keys %{ $blocks{"L"}{$section} }, keys %{ $blocks{"R"}{$section} } ) {
@@ -210,7 +244,9 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 				}
 
 				if ( $blocks{"L"}{$section}{$key} ne $blocks{"R"}{$section}{$key} ) {
-					print "<=> track $track section $section: $key differs: " . $blocks{"L"}{$section}{$key} . " <=> " . $blocks{"R"}{$section}{$key} . "\n";
+					print "<=> track $track section $section: $key differs: "
+					  . $blocks{"L"}{$section}{$key} . " <=> "
+					  . $blocks{"R"}{$section}{$key} . "\n";
 					$differencesFound = 1;
 				}
 			}
@@ -229,8 +265,10 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 				if ( $key =~ m/^comment\[\d+\]$/ ) {
 					foreach my $side ( "R", "L" ) {
 						if ( defined $blocks{$side}{$section}{$key} ) {
-							if ( $blocks{$side}{$section}{$key} =~ m/([^=]+)=(.+)/ ) {
-								$comments{$side}{$1} = $2;
+							if ( $blocks{$side}{$section}{$key} =~ m/([^=]+)=(.*)/ ) {
+								if ( $2 ne "" ) {
+									$comments{$side}{$1} = $2;
+								}
 							}
 							else {
 								die "not key=value: " . $blocks{$side}{$section}{$key};
@@ -254,7 +292,9 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 				}
 
 				if ( $blocks{"L"}{$section}{$key} ne $blocks{"R"}{$section}{$key} ) {
-					print "<=> track $track section $section: $key differs: " . $blocks{"L"}{$section}{$key} . " <=> " . $blocks{"R"}{$section}{$key} . "\n";
+					print "<=> track $track section $section: $key differs: "
+					  . $blocks{"L"}{$section}{$key} . " <=> "
+					  . $blocks{"R"}{$section}{$key} . "\n";
 					$differencesFound = 1;
 				}
 			}
@@ -274,13 +314,33 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 					next;
 				}
 
+				my $skipIfOnlyInOneFile = 0;
+				if (       ( $key eq 'DISCNUMBER' )
+					or ( $key eq 'GENRE' )
+					or ( $key eq 'MUSICBRAINZ_ALBUMARTISTID' )
+					or ( $key eq 'MUSICBRAINZ_ALBUMID' )
+					or ( $key eq 'MUSICBRAINZ_ARTISTID' )
+					or ( $key eq 'MUSICBRAINZ_DISCID' )
+					or ( $key eq 'MUSICBRAINZ_TRACKID' )
+					or ( $key eq 'TOTALDISCS' )
+					or ( $key eq 'TOTALTRACKS' ) )
+				{
+					$skipIfOnlyInOneFile = 1;
+				}
+
 				if ( !defined $comments{"L"}{$key} ) {
-					print "==> track $track section $section: additional comment: $key=" . $comments{"R"}{$key} . "\n";
-					$differencesFound = 1;
+					if ( $skipIfOnlyInOneFile == 0 ) {
+						print "==> track $track section $section: additional comment: $key="
+						  . $comments{"R"}{$key} . "\n";
+						$differencesFound = 1;
+					}
 				}
 				elsif ( !defined $comments{"R"}{$key} ) {
-					print "<== track $track section $section: additional comment: $key=" . $comments{"L"}{$key} . "\n";
-					$differencesFound = 1;
+					if ( $skipIfOnlyInOneFile == 0 ) {
+						print "<== track $track section $section: additional comment: $key="
+						  . $comments{"L"}{$key} . "\n";
+						$differencesFound = 1;
+					}
 				}
 				elsif ( $comments{"L"}{$key} ne $comments{"R"}{$key} ) {
 					if ( $key eq 'TRACKNUMBER' ) {
@@ -292,7 +352,9 @@ foreach my $track ( sort { $a <=> $b } keys %tracks ) {
 						}
 					}
 
-					print "<=> track $track section $section: comment $key differs: " . $comments{"L"}{$key} . " <=> " . $comments{"R"}{$key} . "\n";
+					print "<=> track $track section $section: comment $key differs: "
+					  . $comments{"L"}{$key} . " <=> "
+					  . $comments{"R"}{$key} . "\n";
 					$differencesFound = 1;
 				}
 			}
